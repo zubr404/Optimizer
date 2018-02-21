@@ -1,0 +1,180 @@
+﻿C:\Users\Ferz\MainProject\Optimizer\Optimizer\bin\Debug\DataFiles\TestResult\SBRF
+C:\Users\Ferz\MainProject\Optimizer\Optimizer\bin\Debug\DataFiles\TestTrades\SBRF\OPT
+C:\Users\Ferz\MainProject\Optimizer\Optimizer\bin\Debug\DataFiles\TestTrades\SBRF\Simple
+
+namespace Optimizer
+{
+    /// <summary>
+    /// Тест торговли. Алгоритм.
+    /// </summary>
+    public class TestMarketDriver
+    {
+        TestResultRepositiry _testResultRepo;
+
+        #region -Constructor-
+        public TestMarketDriver(RepositiryClasses _rC)
+        {
+            _testResultRepo = _rC.TestResReposit;
+        }
+        #endregion
+
+        #region -Method-
+
+        #region -Algoritm-
+        /// <summary>
+        /// Открываем лонги, если цена выше самой верхней линии.
+        /// Открываем шорты, если цена ниже самой нижней линии.
+        /// Закрытие: переворачиваемся.
+        /// </summary>
+        public void TrendAlgoritmTest()
+        {
+            string file_name = "test_result.txt";
+            StaticService.DeleteFile(file_name);
+
+            _testResultRepo.Clear();
+
+            foreach (string _key in _roBB.Keys)
+            {
+                TradesBolingerRepository ctR = _roBB[_key];
+
+                _testTradReposit.Add(_key, new TestTradesCollection());
+                _testTradReposit.Add(_key + "OPT", new TestTradesCollection());
+
+                double price_buy = 0;
+                double price_sell = 0;
+
+                int tp = 0;
+                double profitPortfolio = 0; // прибыль портфеля на каждую сделку
+                int countTrades = 0;
+                double maxProfit = 0;
+                double minProfit = 0;
+                int countProfitTrades = 0;
+                int countLossTrades = 0;
+
+                // OPT
+                int counter_prof = 0;
+                int counter_loss = 0;
+                double profitPortfolioOpt = 0;
+                int countTradesOpt = 0;
+                double maxProfitOpt = 0;
+                double minProfitOpt = 0;
+                int countProfitTradesOpt = 0;
+                int countLossTradesOpt = 0;
+                // end opt
+
+                StaticService.LogFileWrite("\n         ---------" + _key + "---------", file_name, true);
+
+                foreach (ParametrTradesBolinger pcT in ctR)
+                {
+                    //StaticClassService.LogFileWrite(pcT.DateTimeTrades + "\t" + pcT.NumberTrades + "\t" + pcT.PriceTrades + "\t" + pcT.SeccodeTrades + "\t" + pcT.LineUp + "\t" + pcT.LineDown + "\t" + pcT.LineMidl, file_name, true);
+
+                    DateTime dateTimeTrade = pcT.DateTimeTrades;
+
+                    if (dateTimeTrade.TimeOfDay < new TimeSpan(19, 0, 0))
+                    {
+                        double price = (double)pcT.PriceTrades;
+                        double lineUp = pcT.LineUp;
+                        double lineDown = pcT.LineDown;
+                        double lineMidl = pcT.LineMidl;
+                        double profit = 0; // прибыль самой сделки
+                        double qty = 0;
+
+                        // long
+                        if (tp <= 0 && price > lineUp)
+                        {
+                            price_buy = price + SettingsClass.slipPrice;
+                            profit = CalcProfit(price_buy, price_sell);
+
+                            qty = Math.Abs(tp) + 1; //--1--
+                            tp += Math.Abs(tp) + 1; //--2--
+
+                            CalcParametrTest(profit, dateTimeTrade, ref countTrades, ref profitPortfolio, ref maxProfit, ref minProfit, ref countProfitTrades, ref countLossTrades);
+
+                            _testTradReposit[_key].Add(new ParametrTestTrades(pcT.NumberTrades, dateTimeTrade, price_buy, qty, Operation.Buy, profitPortfolio));
+
+                            StaticService.LogFileWrite("-----" + "\t" + pcT.NumberTrades + "\t" + dateTimeTrade + "\t" + price_buy + "\t" + qty + "\t" + Operation.Buy + "\t" + profitPortfolio, file_name, true);
+
+                            // Opt
+                            if (StaticOptimizer.PsevdoRealTrades(profit, dateTimeTrade, ref counter_prof, ref counter_loss))
+                            {
+                                CalcParametrTest(profit, dateTimeTrade, ref countTradesOpt, ref profitPortfolioOpt, ref maxProfitOpt, ref minProfitOpt, ref countProfitTradesOpt, ref countLossTradesOpt);
+                                _testTradReposit[_key + "OPT"].Add(new ParametrTestTrades(pcT.NumberTrades, dateTimeTrade, price_buy, qty, Operation.Buy, profitPortfolioOpt));
+                            }
+                        }
+
+                        // short
+                        if (tp >= 0 && price < lineDown)
+                        {
+                            price_sell = price - SettingsClass.slipPrice;
+                            profit = CalcProfit(price_buy, price_sell);
+
+                            qty = Math.Abs(tp) + 1; //--1--
+                            tp -= Math.Abs(tp) + 1; //--2--
+
+                            CalcParametrTest(profit, dateTimeTrade, ref countTrades, ref profitPortfolio, ref maxProfit, ref minProfit, ref countProfitTrades, ref countLossTrades);
+
+                            _testTradReposit[_key].Add(new ParametrTestTrades(pcT.NumberTrades, dateTimeTrade, price_sell, qty, Operation.Sell, profitPortfolio));
+
+                            StaticService.LogFileWrite("-----" + "\t" + pcT.NumberTrades + "\t" + dateTimeTrade + "\t" + price_sell + "\t" + qty + "\t" + Operation.Sell + "\t" + profitPortfolio, file_name, true);
+
+                            // Opt
+                            if (StaticOptimizer.PsevdoRealTrades(profit, dateTimeTrade, ref counter_prof, ref counter_loss))
+                            {
+                                CalcParametrTest(profit, dateTimeTrade, ref countTradesOpt, ref profitPortfolioOpt, ref maxProfitOpt, ref minProfitOpt, ref countProfitTradesOpt, ref countLossTradesOpt);
+                                _testTradReposit[_key + "OPT"].Add(new ParametrTestTrades(pcT.NumberTrades, dateTimeTrade, price_sell, qty, Operation.Sell, profitPortfolioOpt));
+                            }
+                        }
+                    }
+                }
+
+                // save result
+                _testResultRepo.Add(new ParametrTestResult(_key, profitPortfolio, countTrades, maxProfit, minProfit, countProfitTrades, countLossTrades));
+                _testResultRepo.Add(new ParametrTestResult(_key + "OPT", profitPortfolioOpt, countTradesOpt, maxProfitOpt, minProfitOpt, countProfitTradesOpt, countLossTradesOpt)); // Opt
+            }
+        }
+
+        /// <summary>
+        /// Открытие Лонгов при пересечении самой нижней линии.
+        /// Открытие Шортов при пересечении самой верхней линии.
+        /// Закрытие: переворачиваемся.
+        /// </summary>
+        //public void RangeAlgoritmTest(RepositiryOptionBB _roBB, ref ProfitChartsRepository _profChartRepo)
+        //{
+            
+        //}
+        #endregion
+
+        private void CalcParametrTest(double _profit, DateTime _dtTrade, ref int _countTrd, ref double _profPortf, ref double _maxP, ref double _minP, ref int _countProf, ref int _countLoss)
+        {
+            _countTrd++;
+            _profPortf += _profit;
+            SetMaxMinProfit(ref _maxP, ref _minP, _profPortf);
+            SetCountProfitLoss(ref _countProf, ref _countLoss, _profit);
+        }
+
+        private double CalcProfit(double _priceB, double _priceS)
+        {
+            double value = 0;
+
+            if (_priceB > 0 && _priceS > 0) 
+            {
+                value = _priceS - _priceB;
+            }
+
+            return value;
+        }
+
+        private void SetMaxMinProfit(ref double _maxProf, ref double _minProf, double _currentProf)
+        {
+            if (_currentProf > _maxProf) { _maxProf = _currentProf; }
+            if (_currentProf < _minProf) { _minProf = _currentProf; }
+        }
+
+        private void SetCountProfitLoss(ref int _countProfit, ref int _countLoss, double _profit)
+        {
+            if (_profit > 0) { _countProfit++; }
+            if (_profit < 0) { _countLoss++; }
+        }
+        #endregion
+    }
+}
